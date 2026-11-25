@@ -159,6 +159,27 @@ uid=999(appuser) gid=999(appuser) groups=999(appuser)
 
 Log Nginx xác nhận POST /ask 200. Đã dọn stack bằng docker compose -p k5-day14-docker -f 02-docker/production/docker-compose.yml down -v. Compose cảnh báo version obsolete nhưng không ảnh hưởng test.
 
+## Part 3 — Cloud Deployment (CP6)
+
+Chọn Railway để deploy agent Part 6 trong 06-lab-complete cùng Redis. CP5 đã đạt PASS 12/12 local. Railway CLI 5.75.0 đã cài; railway whoami trả Unauthorized, cần đăng nhập tài khoản trước khi tạo project. Chưa có URL public, chưa chạy test cloud và chưa có screenshot.
+
+### Railway và Render
+
+| Tiêu chí | railway.toml | render.yaml |
+| --- | --- | --- |
+| Build | builder DOCKERFILE | runtime docker, rootDir 06-lab-complete |
+| Health | healthcheckPath /health | healthCheckPath /health |
+| Redis | Tạo Redis service trong project, tham chiếu REDIS_URL | Blueprint khai báo Key Value service và fromService connectionString |
+| Secret | Đặt AGENT_API_KEY trong Variables | generateValue cho AGENT_API_KEY |
+| Port | Docker CMD đọc PORT | Docker CMD đọc PORT |
+
+### Exercise 3.3 — Cloud Run
+
+cloudbuild.yaml mẫu chạy pytest, build image với tag COMMIT_SHA và latest, push registry, sau đó dùng gcloud run deploy tại asia-southeast1.
+service.yaml mô tả cấu hình IaC: 1–10 instances, concurrency 80, timeout 60s, CPU/RAM, liveness /health và startup /ready.
+Secret Manager cung cấp credential qua biến môi trường thay vì hardcode; nếu áp dụng cho agent CP5 phải bổ sung Redis và kết nối riêng.
+Đây là phân tích pipeline mẫu, không triển khai GCP.
+
 ## Part 4 — API Security (CP3)
 
 ### Exercise 4.1 — API key
@@ -351,3 +372,5 @@ Kết quả thực tế: 43/43 checks passed, image 238 MB, build 19s, docker st
 - CP4: dùng ChatGPT đọc code, giải thích liveness/readiness, graceful shutdown và Redis stateless; chạy thử SIGTERM trên WSL, Docker Compose 3 replicas, test_stateless.py và kiểm tra history sau restart hai replica. Ghi kết quả thực tế; học viên cần tự đọc lại, xác nhận và giải thích kết quả.
 
 - CP5: ChatGPT hỗ trợ triển khai các TODO, chọn Redis Lua atomic, budget reservation, cấu hình cloud và Docker, chạy static check và script chấm đầy đủ trong WSL. Kết quả lấy từ output thật. Học viên cần đọc lại và tự xác nhận, giải thích các quyết định và kiểm tra lại trước khi nộp.
+
+- CP6 (chuẩn bị): ChatGPT đọc yêu cầu, cài Railway CLI, kiểm tra đăng nhập và so sánh cấu hình cloud. Chưa deploy vì cần học viên xác thực tài khoản.
