@@ -161,7 +161,7 @@ Log Nginx xác nhận POST /ask 200. Đã dọn stack bằng docker compose -p k
 
 ## Part 3 — Cloud Deployment (CP6)
 
-Chọn Railway để deploy agent Part 6 trong 06-lab-complete cùng Redis. CP5 đã đạt PASS 12/12 local. Railway CLI 5.75.0 đã cài; railway whoami trả Unauthorized, cần đăng nhập tài khoản trước khi tạo project. Chưa có URL public, chưa chạy test cloud và chưa có screenshot.
+Chọn Railway để deploy agent Part 6 trong 06-lab-complete cùng Redis. CP5 đã đạt PASS 12/12 local. Railway CLI 5.75.0 đã cài và đăng nhập thành công. Project day14-agent có agent và Redis đều SUCCESS. URL public: https://agent-production-37de1463.up.railway.app. HTTP thực tế: GET /health 200, GET /ready 200, POST /ask không key 401, POST /ask có key 200. Chưa có ba screenshot cloud; cần bổ sung trước khi nộp.
 
 ### Railway và Render
 
@@ -374,3 +374,5 @@ Kết quả thực tế: 43/43 checks passed, image 238 MB, build 19s, docker st
 - CP5: ChatGPT hỗ trợ triển khai các TODO, chọn Redis Lua atomic, budget reservation, cấu hình cloud và Docker, chạy static check và script chấm đầy đủ trong WSL. Kết quả lấy từ output thật. Học viên cần đọc lại và tự xác nhận, giải thích các quyết định và kiểm tra lại trước khi nộp.
 
 - CP6 (chuẩn bị): ChatGPT đọc yêu cầu, cài Railway CLI, kiểm tra đăng nhập và so sánh cấu hình cloud. Chưa deploy vì cần học viên xác thực tài khoản.
+
+- CP6 (deploy): học viên đăng nhập Railway và đặt secret qua Raw Editor; ChatGPT tạo project, Redis, agent service, upload source, tạo domain và kiểm thử HTTP thật. Không ghi secret vào repo. Học viên cần chụp ảnh bằng chứng và xác nhận trước khi nộp.

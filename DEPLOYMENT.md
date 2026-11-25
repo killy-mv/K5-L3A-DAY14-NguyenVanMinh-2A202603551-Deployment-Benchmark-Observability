@@ -2,22 +2,22 @@
 
 ## Public URL
 
-Chưa có — chờ đăng nhập Railway và triển khai.
+https://agent-production-37de1463.up.railway.app
 
 ## Platform
 
-Railway (dự kiến). Deploy 06-lab-complete/, không dùng app mẫu Part 3.
+Railway (trial). Deploy 06-lab-complete/, không dùng app mẫu Part 3.
 
 ## Trạng thái
 
 - CP5: PASS 12/12 local, 43/43 checks.
 - Railway CLI: 5.75.0.
-- railway whoami: Unauthorized; cần railway login.
-- Cloud Redis, agent và public domain: chưa tạo.
+- Railway authentication: thành công.
+- Cloud Redis và agent: SUCCESS. Public domain HTTPS đã tạo.
 
 ## Environment Variables
 
-Các biến dự kiến đặt trên Railway, chưa xác nhận đã đặt: PORT (platform), REDIS_URL (Redis service), AGENT_API_KEY (secret), ENVIRONMENT=production, RATE_LIMIT_PER_MINUTE=10, MONTHLY_BUDGET_USD=10.
+Đã xác nhận các biến trên Railway: PORT (platform), REDIS_URL (Redis service), AGENT_API_KEY (secret), ENVIRONMENT=production, RATE_LIMIT_PER_MINUTE=10, MONTHLY_BUDGET_USD=10.
 
 ## Test Commands
 
@@ -34,8 +34,8 @@ curl -sS -o /dev/null -w '%{http_code}
 ' -X POST "$BASE/ask" -H 'Content-Type: application/json' -H "X-API-Key: $AGENT_API_KEY" -d '{"question":"Hello"}'
 ```
 
-Kỳ vọng lần lượt 200, 200, 401, 200; chưa chạy trên cloud.
+Kết quả thực tế ngày 25/11/2026: 200, 200, 401, 200. Ba test đầu chạy curl; test có key chạy Python urllib thông qua railway run --service agent --no-local, không in secret.
 
 ## Screenshots
 
-Chưa có dashboard.png, running.png, test.png. Chỉ bổ sung sau deployment thật.
+Chưa chụp ảnh dashboard.png, running.png, test.png; cần bổ sung ảnh thật trước khi nộp.
