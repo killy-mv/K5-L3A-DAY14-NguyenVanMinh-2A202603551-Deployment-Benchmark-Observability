@@ -159,6 +159,62 @@ uid=999(appuser) gid=999(appuser) groups=999(appuser)
 
 Log Nginx xác nhận POST /ask 200. Đã dọn stack bằng docker compose -p k5-day14-docker -f 02-docker/production/docker-compose.yml down -v. Compose cảnh báo version obsolete nhưng không ảnh hưởng test.
 
+## Part 4 — API Security (CP3)
+
+### Exercise 4.1 — API key
+
+APIKeyHeader đọc X-API-Key; verify_api_key được inject qua Depends vào POST /ask. Thiếu key trả 401, sai key trả 403, đúng key cho phép xử lý. Rotate bằng cách đổi AGENT_API_KEY qua secret manager hoặc biến môi trường, restart service và cập nhật client; không ghi key thật vào Git. Bản mẫu có default demo và print key khi chạy trực tiếp, không nên dùng cách đó trong production.
+
+Test trên WSL, chạy Uvicorn trực tiếp với key demo theo README. Output curl -i thực tế (lược header không liên quan):
+
+```text
+HTTP/1.1 401 Unauthorized
+{"detail":"Missing API key. Include header: X-API-Key: <your-key>"}
+HTTP/1.1 403 Forbidden
+{"detail":"Invalid API key."}
+HTTP/1.1 200 OK
+{"question":"Hello","answer":"Tôi là AI agent được deploy lên cloud. Câu hỏi của bạn đã được nhận."}
+```
+
+### Exercise 4.2 — JWT
+
+Client gửi thông tin đăng nhập demo tới POST /auth/token (theo README), server authenticate_user kiểm tra và create_token ký HS256 với sub, role, iat, exp (60 phút). Client gửi Authorization: Bearer token; verify_token xác minh chữ ký và hạn, trả username và role. JWT được ký chứ không mã hóa; không đưa thông tin nhạy cảm vào payload. Secret mặc định và user demo chỉ dùng local.
+
+Đã tắt server develop trước khi chạy production. Dùng Python urllib gửi HTTP request tương đương curl, không ghi token vào output. Kết quả thực tế:
+
+```text
+POST /ask (không token): 401
+www-authenticate: Bearer
+{"detail":"Authentication required. Include: Authorization: Bearer <token>"}
+POST /auth/token: 200
+{"token_type":"bearer","expires_in_minutes":60}
+POST /ask (Bearer [REDACTED]): 200
+{"question":"Explain JWT","answer":"Đây là câu trả lời từ AI agent (mock). Trong production, đây sẽ là response từ OpenAI/Anthropic.","usage":{"requests_remaining":9,"budget_remaining_usd":0.000021}}
+```
+
+### Exercise 4.3 — Rate limiting
+
+Sliding window theo timestamp: mỗi user có deque, xóa timestamp cũ hơn 60 giây, kiểm tra độ dài, thêm timestamp khi cho phép. User thường 10 req/phút; admin 100 req/phút qua role đã xác thực, không phải bypass vô hạn. State in-memory chỉ phù hợp demo một process.
+
+Vòng lặp 20 request HTTP liên tiếp với token student (đã gọi 1 request ở Exercise 4.2): request 1–9 trả 200, request 10–20 trả 429. Tổng 10 request được xử lý, 11 bị chặn.
+
+```text
+Request 10: HTTP 429
+x-ratelimit-limit: 10
+x-ratelimit-remaining: 0
+x-ratelimit-reset: 1795593351
+retry-after: 59
+{"detail":{"error":"Rate limit exceeded","limit":10,"window_seconds":60,"retry_after_seconds":59}}
+```
+
+GET /me/usage trả 200, requests=10, input_tokens=40, output_tokens=300, cost_usd=0.000186, budget_usd=1.0, budget_remaining_usd=0.999814. Đây là chi phí giả lập, không phát sinh bill LLM.
+
+### Exercise 4.4 — Cost guard
+
+Bản mẫu CostGuard theo dõi token và chi phí trong RAM, giới hạn 1 USD/ngày/user và 10 USD/ngày toàn hệ thống, cảnh báo 80%, trả 402 khi vượt budget user hoặc 503 khi vượt global. Code mẫu chưa reset global counter khi sang ngày; trường budget_remaining_usd trong /ask thực ra trả tổng cost, còn /me/usage trả remaining đúng.
+
+Thiết kế cho yêu cầu 10 USD/tháng/user: dùng Redis key budget:{user_id}:{YYYY-MM} theo UTC; lưu chi phí bằng integer micro-USD (10 USD = 10000000), đặt expiry đến đầu tháng kế tiếp. Dùng Lua hoặc transaction WATCH/MULTI/EXEC để kiểm tra current + estimated_cost và reserve atomically trước khi gọi LLM; nếu vượt thì từ chối 402. Sau khi hoàn thành, reconcile chi phí thực tế, giải phóng phần reserve dư hoặc khi request thất bại. Key tháng mới tự bắt đầu từ 0, không phụ thuộc restart. Nếu Redis lỗi, fail closed. Rate limiter hạn chế tốc độ, cost guard hạn chế tổng chi phí; cả hai cần thiết vì mỗi request có số token khác nhau. Phần này là giải thích thiết kế theo CHECKPOINTS.md; triển khai Redis ở CP5.
+
 ## AI log
 
 - CP0: dùng ChatGPT kiểm tra môi trường, đọc hướng dẫn WSL và chạy các lệnh setup; kết quả ghi theo output thực tế. Sau khi học viên bật Docker Desktop, AI chạy lại hello-world trên cả Windows và WSL; cả hai thành công.
@@ -166,3 +222,5 @@ Log Nginx xác nhận POST /ask 200. Đã dọn stack bằng docker compose -p k
 - CP1: dùng ChatGPT gợi ý phân tích anti-pattern và bảng so sánh, chạy thử hai server local và ghi output thực tế. Không sửa code mẫu. Học viên cần đọc lại, xác nhận các giải thích và tự kiểm tra bằng các lệnh trên.
 
 - CP2: dùng ChatGPT đọc Dockerfile, gợi ý giải thích cache/multi-stage, chạy build, đo size bằng Docker, test container và Compose qua Nginx, ghi số liệu thực tế. Không sửa source mẫu; học viên cần đọc lại và tự xác nhận kết quả.
+
+- CP3: dùng ChatGPT đọc code mẫu, giải thích API key, JWT, sliding window và thiết kế cost guard; chạy test HTTP local thực tế bằng curl và urllib, không ghi token. Học viên cần đọc lại và tự xác nhận. Không sửa source mẫu.
