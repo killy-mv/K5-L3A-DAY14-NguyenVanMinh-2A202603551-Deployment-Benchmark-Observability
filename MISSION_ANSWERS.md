@@ -6,7 +6,7 @@
 - Python Windows: 3.15.2; môi trường làm bài chọn Ubuntu 24.04 WSL, Python 3.12.3, os.name = posix.
 - Docker Compose trên Windows: v5.5.1.
 - Đã tạo virtual environment WSL tại ~/.venvs/k5day14 và cài dependencies Part 1 thành công.
-- Docker Desktop Engine chưa kết nối; docker run --rm hello-world chưa chạy được (dockerDesktopLinuxEngine pipe không tồn tại). Đã thử docker desktop start và kiểm tra lại. WSL chưa nhận Docker CLI. Cần bật Docker Desktop và WSL Integration trước CP2.
+- Docker Desktop đã được bật và kiểm tra lại thành công: Docker Engine 29.8.1, Docker Compose v5.5.1 trên WSL. Lệnh docker run --rm hello-world trả về Hello from Docker! trên cả Windows và Ubuntu-24.04 WSL. Python 3.12.3 trong virtual environment vẫn hoạt động. CP0 đạt toàn bộ yêu cầu setup đã kiểm tra.
 
 ## Part 1 — Localhost vs Production (CP1)
 
@@ -71,6 +71,6 @@ Ví dụ cụ thể: develop/app.py dòng 52 cố định port 8000, production/
 
 ## AI log
 
-- CP0: dùng ChatGPT kiểm tra môi trường, đọc hướng dẫn WSL và chạy các lệnh setup; kết quả ghi theo output thực tế. Học viên cần kiểm tra lại Docker và xác nhận môi trường.
+- CP0: dùng ChatGPT kiểm tra môi trường, đọc hướng dẫn WSL và chạy các lệnh setup; kết quả ghi theo output thực tế. Sau khi học viên bật Docker Desktop, AI chạy lại hello-world trên cả Windows và WSL; cả hai thành công.
 
 - CP1: dùng ChatGPT gợi ý phân tích anti-pattern và bảng so sánh, chạy thử hai server local và ghi output thực tế. Không sửa code mẫu. Học viên cần đọc lại, xác nhận các giải thích và tự kiểm tra bằng các lệnh trên.
