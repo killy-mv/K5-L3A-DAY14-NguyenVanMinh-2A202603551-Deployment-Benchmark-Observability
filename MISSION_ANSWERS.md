@@ -215,6 +215,96 @@ Bản mẫu CostGuard theo dõi token và chi phí trong RAM, giới hạn 1 USD
 
 Thiết kế cho yêu cầu 10 USD/tháng/user: dùng Redis key budget:{user_id}:{YYYY-MM} theo UTC; lưu chi phí bằng integer micro-USD (10 USD = 10000000), đặt expiry đến đầu tháng kế tiếp. Dùng Lua hoặc transaction WATCH/MULTI/EXEC để kiểm tra current + estimated_cost và reserve atomically trước khi gọi LLM; nếu vượt thì từ chối 402. Sau khi hoàn thành, reconcile chi phí thực tế, giải phóng phần reserve dư hoặc khi request thất bại. Key tháng mới tự bắt đầu từ 0, không phụ thuộc restart. Nếu Redis lỗi, fail closed. Rate limiter hạn chế tốc độ, cost guard hạn chế tổng chi phí; cả hai cần thiết vì mỗi request có số token khác nhau. Phần này là giải thích thiết kế theo CHECKPOINTS.md; triển khai Redis ở CP5.
 
+## Part 5 — Scaling & Reliability (CP4)
+
+### Exercise 5.1 — Health checks
+
+Liveness /health kiểm tra process còn hoạt động; readiness /ready xác định khả năng nhận traffic. Khi dependency như Redis lỗi, production cần giữ liveness 200 nếu process còn sống và readiness 503 để loại instance khỏi traffic. Bản develop dùng cờ _is_ready trong lifespan và psutil để báo tình trạng bộ nhớ, chưa kiểm tra Redis.
+
+Chạy develop/app.py bằng Python 3.12.3 trong WSL, cài requirements.txt. Output thực tế (25/11/2026):
+
+```text
+GET /health: HTTP 200
+{"status":"ok","uptime_seconds":0.3,"version":"1.0.0","environment":"development","timestamp":"2026-11-25T08:01:45.557861+00:00","checks":{"memory":{"status":"ok","used_percent":16.3}}}
+GET /ready: HTTP 200
+{"ready":true,"in_flight_requests":1}
+```
+
+### Exercise 5.2 — Graceful shutdown
+
+Uvicorn xử lý SIGTERM, ngừng nhận kết nối mới, chờ request hiện tại hoàn tất rồi gọi lifespan shutdown để cleanup. Bản mẫu cấu hình timeout_graceful_shutdown=30 và theo dõi in-flight requests. SIGKILL không cho phép cleanup.
+
+Test bằng subprocess và HTTP client trong WSL: gửi POST /ask?question=Long%20task, đợi 0.8 giây rồi gửi SIGTERM khi future chưa hoàn thành. Output:
+
+```text
+Sending SIGTERM while request pending: True
+IN-FLIGHT RESPONSE (200, '{"answer":"Agent đang hoạt động tốt! (mock response) Hỏi thêm câu hỏi đi nhé."}')
+Elapsed seconds 3.01
+Process exit 0
+INFO: Shutting down
+POST /ask?question=Long%20task HTTP/1.1 200 OK
+INFO: Waiting for application shutdown.
+Graceful shutdown initiated...
+Shutdown complete
+INFO: Application shutdown complete.
+```
+
+Request hoàn thành trước khi process thoát, không bị mất response.
+
+### Exercise 5.3 — Stateless design
+
+Nếu history nằm trong dict RAM, mỗi replica có bản riêng; request tiếp theo đến replica khác sẽ không thấy history, restart làm mất dữ liệu. Bản production dùng Redis chung, key session:{session_id}, TTL 3600 giây, tối đa 20 messages. Client gửi lại session_id để mọi instance đọc và ghi cùng session.
+
+Bản mẫu có fallback RAM khi không kết nối Redis lúc khởi động, nên chỉ stateless khi USE_REDIS=True. Read-modify-write history chưa atomic khi nhiều request đồng thời cùng session; production thực sự cần Redis transaction hoặc thao tác atomic. Mock LLM chỉ dùng câu hỏi hiện tại, không suy luận từ history.
+
+### Exercise 5.4 — Load balancing
+
+Tạo .env.local rỗng (ignored), chạy từ 05-scaling-reliability/production:
+
+```bash
+docker compose -p k5-day14-scaling up -d --build --scale agent=3 --wait
+docker compose -p k5-day14-scaling ps
+curl -i http://127.0.0.1:8080/health
+curl -i http://127.0.0.1:8080/ready
+python test_stateless.py
+```
+
+```mermaid
+flowchart TD
+    Client -->|8080| Nginx
+    Nginx --> Agent1
+    Nginx --> Agent2
+    Nginx --> Agent3
+    Agent1 --> Redis
+    Agent2 --> Redis
+    Agent3 --> Redis
+```
+
+Compose ps: agent-1, agent-2, agent-3 và redis healthy; nginx Up. Nginx dùng upstream agent:8000 qua Docker DNS và X-Served-By để quan sát upstream. Hai health request trả HTTP 200; /health báo storage=redis và redis_connected=true.
+
+### Exercise 5.5 — Test stateless
+
+Output thực tế của test_stateless.py:
+
+```text
+Session ID: d362a0c7-5b79-4f49-872e-54b19db32daa
+Request 1: [instance-b3abc4]
+Request 2: [instance-4710f6]
+Request 3: [instance-5c5ccc]
+Request 4: [instance-b3abc4]
+Request 5: [instance-4710f6]
+Total requests: 5
+Instances used: {'instance-b3abc4', 'instance-4710f6', 'instance-5c5ccc'}
+Total messages: 10
+Session history preserved across all instances via Redis!
+```
+
+5 câu hỏi, 5 câu trả lời, đủ 10 messages. redis-cli --scan --pattern session:* xác nhận key session:d362a0c7-5b79-4f49-872e-54b19db32daa tồn tại. Log cả ba agent xác nhận kết nối Redis và POST /chat 200. Script gốc không tự dừng replica.
+
+Test bổ sung: dừng cả ba agent, bật lại agent-2 và agent-3, giữ Redis và Nginx chạy. Sau khi readiness phục hồi, GET /chat/{session_id}/history qua Nginx trả HTTP 200, count=10; agent-1 Exited (0), hai agent còn lại healthy. Chứng minh history không phụ thuộc RAM của agent và còn sau restart; không chứng minh failover liên tục không gián đoạn vì đã dừng cả ba agent trong thí nghiệm này.
+
+Đã dọn stack riêng bằng docker compose -p k5-day14-scaling down -v. Không sửa source mẫu.
+
 ## AI log
 
 - CP0: dùng ChatGPT kiểm tra môi trường, đọc hướng dẫn WSL và chạy các lệnh setup; kết quả ghi theo output thực tế. Sau khi học viên bật Docker Desktop, AI chạy lại hello-world trên cả Windows và WSL; cả hai thành công.
@@ -224,3 +314,5 @@ Thiết kế cho yêu cầu 10 USD/tháng/user: dùng Redis key budget:{user_id}
 - CP2: dùng ChatGPT đọc Dockerfile, gợi ý giải thích cache/multi-stage, chạy build, đo size bằng Docker, test container và Compose qua Nginx, ghi số liệu thực tế. Không sửa source mẫu; học viên cần đọc lại và tự xác nhận kết quả.
 
 - CP3: dùng ChatGPT đọc code mẫu, giải thích API key, JWT, sliding window và thiết kế cost guard; chạy test HTTP local thực tế bằng curl và urllib, không ghi token. Học viên cần đọc lại và tự xác nhận. Không sửa source mẫu.
+
+- CP4: dùng ChatGPT đọc code, giải thích liveness/readiness, graceful shutdown và Redis stateless; chạy thử SIGTERM trên WSL, Docker Compose 3 replicas, test_stateless.py và kiểm tra history sau restart hai replica. Ghi kết quả thực tế; học viên cần tự đọc lại, xác nhận và giải thích kết quả.
