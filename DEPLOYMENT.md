@@ -38,4 +38,6 @@ Kết quả thực tế ngày 25/11/2026: 200, 200, 401, 200. Ba test đầu ch�
 
 ## Screenshots
 
-Chưa chụp ảnh dashboard.png, running.png, test.png; cần bổ sung ảnh thật trước khi nộp.
+- [Deployment dashboard](screenshots/dashboard.png) — agent và Redis Online.
+- [Service running](screenshots/running.png) — Active, Deployment successful.
+- [Test results](screenshots/test.png) — học viên tự chạy curl: 200, 200, 401, 200; không hiển thị key.
