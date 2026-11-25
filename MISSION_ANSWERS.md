@@ -376,3 +376,5 @@ Kết quả thực tế: 43/43 checks passed, image 238 MB, build 19s, docker st
 - CP6 (chuẩn bị): ChatGPT đọc yêu cầu, cài Railway CLI, kiểm tra đăng nhập và so sánh cấu hình cloud. Chưa deploy vì cần học viên xác thực tài khoản.
 
 - CP6 (deploy): học viên đăng nhập Railway và đặt secret qua Raw Editor; ChatGPT tạo project, Redis, agent service, upload source, tạo domain và kiểm thử HTTP thật. Không ghi secret vào repo. Học viên đã chụp ảnh bằng chứng và tự chạy lại bốn lệnh curl; AI sao chép ảnh nguyên gốc vào repo và xác minh SHA-256 trùng với ảnh học viên gửi.
+
+- CP7: ChatGPT hỗ trợ chạy agent v1/v2, 7 load tests (300 requests mỗi lần), eval 3 lần, phân tích 2 câu sai và bổ sung tài liệu JWT/HPA vào KB develop, tổng hợp BENCHMARK_REPORT.md trực tiếp từ JSON. Không sửa golden dataset hay script chấm. Giữ nguyên SLO FAIL thực tế và baseline v1 FAIL; gate cuối 23/23 PASS, không regression. Học viên cần kiểm tra report và giải thích kết quả.
