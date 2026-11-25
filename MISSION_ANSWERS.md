@@ -305,6 +305,39 @@ Test bổ sung: dừng cả ba agent, bật lại agent-2 và agent-3, giữ Red
 
 Đã dọn stack riêng bằng docker compose -p k5-day14-scaling down -v. Không sửa source mẫu.
 
+## Part 6 — Final Project (CP5)
+
+Đã triển khai agent trong 06-lab-complete, giữ nguyên script chấm và mock LLM. Cấu hình đọc từ env; xác thực API key bằng so sánh constant-time; Redis sliding window dùng Lua atomic và hash API key; cost guard tổng mặc định 10 USD/tháng UTC, tùy chọn daily cap, reserve theo mức token tối đa của mock và đối soát chi phí thực tế, dùng integer micro-USD và TTL theo kỳ. Redis lỗi thì fail closed cho request cần bảo vệ. Health độc lập Redis, readiness ping Redis. Log app dùng json.dumps; Uvicorn xử lý SIGTERM và lifespan đóng Redis client. Docker multi-stage slim, non-root, healthcheck, exec Uvicorn PID 1. Compose có Redis AOF và volume. Đã cấu hình Railway/Render; chưa deploy public (CP6).
+
+Chạy đầy đủ trong WSL Ubuntu 24.04, Python 3.12.3, Docker 29.8.1:
+
+```bash
+cd 06-lab-complete
+python check_production_ready.py
+```
+
+Kết quả thực tế: 43/43 checks passed, image 238 MB, build 19s, docker stop 0.7s, exit code 0. Rate limit 429 sau 5 request thành công theo cấu hình test, vẫn 429 sau restart; Redis down /ready 503; cost guard budget rất nhỏ trả 402 ngay request đầu; 12 dòng JSON hợp lệ; SIGTERM khi có request trả 200 và exit 0.
+
+```text
+📋 Checklist Deliverable
+     ✅ Dockerfile (multi-stage, < 500 MB)
+     ✅ docker-compose.yml (agent + redis)
+     ✅ .dockerignore
+     ✅ Health check endpoint (GET /health)
+     ✅ Readiness endpoint (GET /ready)
+     ✅ API Key authentication
+     ✅ Rate limiting
+     ✅ Cost guard
+     ✅ Config từ environment variables
+     ✅ Structured logging
+     ✅ Graceful shutdown
+     ✅ Public URL ready (Railway / Render config)
+----------------------------------------------------------------
+  Result: 12/12 tiêu chí đạt · 43/43 checks passed
+  🎉 PASS 12/12 — PRODUCTION READY! Deploy nào!
+================================================================
+```
+
 ## AI log
 
 - CP0: dùng ChatGPT kiểm tra môi trường, đọc hướng dẫn WSL và chạy các lệnh setup; kết quả ghi theo output thực tế. Sau khi học viên bật Docker Desktop, AI chạy lại hello-world trên cả Windows và WSL; cả hai thành công.
@@ -316,3 +349,5 @@ Test bổ sung: dừng cả ba agent, bật lại agent-2 và agent-3, giữ Red
 - CP3: dùng ChatGPT đọc code mẫu, giải thích API key, JWT, sliding window và thiết kế cost guard; chạy test HTTP local thực tế bằng curl và urllib, không ghi token. Học viên cần đọc lại và tự xác nhận. Không sửa source mẫu.
 
 - CP4: dùng ChatGPT đọc code, giải thích liveness/readiness, graceful shutdown và Redis stateless; chạy thử SIGTERM trên WSL, Docker Compose 3 replicas, test_stateless.py và kiểm tra history sau restart hai replica. Ghi kết quả thực tế; học viên cần tự đọc lại, xác nhận và giải thích kết quả.
+
+- CP5: ChatGPT hỗ trợ triển khai các TODO, chọn Redis Lua atomic, budget reservation, cấu hình cloud và Docker, chạy static check và script chấm đầy đủ trong WSL. Kết quả lấy từ output thật. Học viên cần đọc lại và tự xác nhận, giải thích các quyết định và kiểm tra lại trước khi nộp.

@@ -1,9 +1,9 @@
 # Part 6 — Final Project: Production-ready AI Agent
 
 Bạn tự xây một AI agent đủ chuẩn production từ **bản khung** trong thư mục này, kết hợp mọi thứ đã học ở Part 1–5.
-Mọi file đều đã có sẵn, phần việc của bạn nằm ở các chỗ ghi `TODO`. Bản khung chạy được nhưng **chưa đạt tiêu chí nào**.
+Source trong thư mục này là bản triển khai từ khung TODO.
 
-Bài chỉ được tính hoàn thành khi script chấm báo **`PASS 12/12`**:
+Bản triển khai CP5 đã hoàn thiện các mục TODO. Bài chỉ được tính hoàn thành khi script chấm báo **`PASS 12/12`**:
 
 ```bash
 pip install -r requirements.txt
@@ -84,11 +84,13 @@ Script tự khởi động agent của bạn, gọi API thật, build và chạy
 ```bash
 pip install -r requirements.txt
 cp .env.example .env
+# Đặt AGENT_API_KEY trong .env thành giá trị local của bạn; không commit .env.
 
 # Chạy nhanh không cần Docker (cần Redis riêng nếu muốn test rate limit thật)
 AGENT_API_KEY=dev-key uvicorn app.main:app --reload
+# Với local, cần Redis ở REDIS_URL (mặc định localhost:6379) để gọi /ask.
 
-# Chạy cả agent + redis
+# Chạy cả agent + redis (đặt AGENT_API_KEY=dev-key trong .env cho ví dụ bên dưới)
 docker compose up --build
 
 curl http://localhost:8000/health
@@ -98,6 +100,10 @@ curl -X POST http://localhost:8000/ask \
 ```
 
 ---
+
+## Cấu hình triển khai
+
+Rate limit mặc định 10 request/phút/API key, lưu Redis. Budget tổng mặc định 10 USD/tháng UTC; DAILY_BUDGET_USD là giới hạn ngày tùy chọn. Chi phí Mock LLM được ước lượng theo token, reserve trước khi chạy và đối soát sau khi trả lời. Không có Redis thì /health vẫn 200, /ready và /ask hợp lệ trả 503. Đặt secret riêng trên nền tảng cloud. Render Blueprint dùng thư mục 06-lab-complete và Redis Key Value; Railway cần tạo Redis service và đặt REDIS_URL.
 
 ## Chấm bài
 
