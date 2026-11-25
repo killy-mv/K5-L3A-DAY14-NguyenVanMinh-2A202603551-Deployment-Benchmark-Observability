@@ -328,7 +328,7 @@ Test bổ sung: dừng cả ba agent, bật lại agent-2 và agent-3, giữ Red
 
 ## Part 6 — Final Project (CP5)
 
-Đã triển khai agent trong 06-lab-complete, giữ nguyên script chấm và mock LLM. Cấu hình đọc từ env; xác thực API key bằng so sánh constant-time; Redis sliding window dùng Lua atomic và hash API key; cost guard tổng mặc định 10 USD/tháng UTC, tùy chọn daily cap, reserve theo mức token tối đa của mock và đối soát chi phí thực tế, dùng integer micro-USD và TTL theo kỳ. Redis lỗi thì fail closed cho request cần bảo vệ. Health độc lập Redis, readiness ping Redis. Log app dùng json.dumps; Uvicorn xử lý SIGTERM và lifespan đóng Redis client. Docker multi-stage slim, non-root, healthcheck, exec Uvicorn PID 1. Compose có Redis AOF và volume. Đã cấu hình Railway/Render; chưa deploy public (CP6).
+Đã triển khai agent trong 06-lab-complete, giữ nguyên script chấm và mock LLM. Cấu hình đọc từ env; xác thực API key bằng so sánh constant-time; Redis sliding window dùng Lua atomic và hash API key; cost guard tổng mặc định 10 USD/tháng UTC, tùy chọn daily cap, reserve theo mức token tối đa của mock và đối soát chi phí thực tế, dùng integer micro-USD và TTL theo kỳ. Redis lỗi thì fail closed cho request cần bảo vệ. Health độc lập Redis, readiness ping Redis. Log app dùng json.dumps; Uvicorn xử lý SIGTERM và lifespan đóng Redis client. Docker multi-stage slim, non-root, healthcheck, exec Uvicorn PID 1. Compose có Redis AOF và volume. Đã cấu hình Railway/Render; cloud deployment đã hoàn thành tại CP6 (xem DEPLOYMENT.md).
 
 Chạy đầy đủ trong WSL Ubuntu 24.04, Python 3.12.3, Docker 29.8.1:
 
@@ -378,3 +378,5 @@ Kết quả thực tế: 43/43 checks passed, image 238 MB, build 19s, docker st
 - CP6 (deploy): học viên đăng nhập Railway và đặt secret qua Raw Editor; ChatGPT tạo project, Redis, agent service, upload source, tạo domain và kiểm thử HTTP thật. Không ghi secret vào repo. Học viên đã chụp ảnh bằng chứng và tự chạy lại bốn lệnh curl; AI sao chép ảnh nguyên gốc vào repo và xác minh SHA-256 trùng với ảnh học viên gửi.
 
 - CP7: ChatGPT hỗ trợ chạy agent v1/v2, 7 load tests (300 requests mỗi lần), eval 3 lần, phân tích 2 câu sai và bổ sung tài liệu JWT/HPA vào KB develop, tổng hợp BENCHMARK_REPORT.md trực tiếp từ JSON. Không sửa golden dataset hay script chấm. Giữ nguyên SLO FAIL thực tế và baseline v1 FAIL; gate cuối 23/23 PASS, không regression. Học viên cần kiểm tra report và giải thích kết quả.
+
+- CP8: ChatGPT sửa lỗi home directory của Dockerfile production, chạy Docker Compose riêng, Locust 100 users 2 phút cho 1 và 3 replica, promtool test rules, fault A–C kết hợp và D/E, polling Prometheus, lấy trace/log có ID trùng khớp, chụp UI thật bằng Edge headless; điền báo cáo từ CSV/JSON và ảnh. Học viên cần tự kiểm tra và giải thích. Không sửa script chấm hoặc alert rules.

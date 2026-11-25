@@ -13,7 +13,7 @@ RUN pip install --no-cache-dir --user -r requirements.txt
 # Stage 2: Runtime
 FROM python:3.11-slim AS runtime
 
-RUN groupadd -r agent && useradd -r -g agent -d /app agent
+RUN groupadd -r agent && useradd -r -g agent -d /home/agent agent
 
 WORKDIR /app
 
@@ -25,6 +25,7 @@ RUN chown -R agent:agent /app
 
 USER agent
 
+ENV HOME=/home/agent
 ENV PATH=/home/agent/.local/bin:$PATH
 ENV PYTHONPATH=/app
 ENV PYTHONDONTWRITEBYTECODE=1

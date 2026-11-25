@@ -1,0 +1,23 @@
+{
+  "container_id": "695a820f787bb624f6ad25732080040f2b4b7fb0454bfa78fd3745dd911e8d94",
+  "start_epoch": 1795600758.8384652,
+  "observed_seconds": 45.2,
+  "alert": [
+    {
+      "labels": {
+        "alertname": "AgentInstanceDown",
+        "instance": "192.168.48.5:8000",
+        "job": "agent",
+        "severity": "critical"
+      },
+      "annotations": {
+        "description": "Prometheus không gọi được /metrics của 192.168.48.5:8000 trong 30s",
+        "summary": "Instance agent 192.168.48.5:8000 không scrape được"
+      },
+      "state": "firing",
+      "activeAt": "2026-11-25T09:59:27.401817116Z",
+      "value": "0e+00"
+    }
+  ],
+  "unpaused": true
+}

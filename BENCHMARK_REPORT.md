@@ -5,7 +5,7 @@
 
 **Họ tên:** Nguyen Van Minh
 **Ngày chạy:** 25/11/2026
-**Môi trường:** Windows / Ubuntu 24.04 WSL2; AMD Ryzen 5 5600H, 12 logical CPUs, 7.5 GiB RAM khả dụng cho WSL; Python 3.12.3, Mock LLM small. CP7 local, không dùng cloud.
+**Môi trường:** Windows / Ubuntu 24.04 WSL2; AMD Ryzen 5 5600H, 12 logical CPUs, 7.5 GiB RAM khả dụng cho WSL; Python 3.12.3, Mock LLM small. CP7 local, không dùng cloud; CP8 Docker Desktop, Python 3.11-slim, mỗi agent giới hạn 0.5 CPU / 256 MiB, mock LLM.
 
 ---
 
@@ -71,56 +71,67 @@ Retrieval tăng token và tổng chi phí nhưng tăng accuracy từ 1/23 lên 2
 
 ## 4. Observability stack (production)
 
-> CP8 chưa chạy; các mục bên dưới chờ số liệu và ảnh thực tế.
+Project Compose: k5-day14-observability. Sửa home user agent trong Dockerfile thành /home/agent và ENV HOME tương ứng do bản mẫu báo ModuleNotFoundError: uvicorn. Build lại thành công, /health và /ask HTTP 200, X-Trace-ID và X-Served-By có mặt, Nginx /metrics 404. promtool check rules: SUCCESS 4 rules; promtool test rules: SUCCESS.
 
 ### 4.1 Screenshot
 
-- [ ] Dashboard Grafana khi đang có tải (thấy rõ Golden Signals)
-- [ ] Một trace chậm trong Jaeger (thấy span nào chiếm thời gian)
-- [ ] Một trace lỗi trong Jaeger (có event `exception`)
-- [ ] Trang Alerts của Prometheus với ít nhất 1 alert đang **firing**
+- [x] [Grafana Golden Signals khi có tải](screenshots/grafana-dashboard.png).
+- [x] [Jaeger slow trace](screenshots/jaeger-slow-trace.png).
+- [x] [Jaeger error trace có event exception](screenshots/jaeger-error-trace.png).
+- [x] [Prometheus: 3 alert đồng thời firing](screenshots/prometheus-alert-firing.png).
+
+Ảnh chụp trực tiếp giao diện bằng Edge headless, không dựng ảnh.
 
 ### 4.2 Thí nghiệm "phá hệ thống"
 
-| # | Thay đổi | Alert nào firing | Thời gian từ lúc đổi → firing | Panel nào phản ánh rõ nhất |
+| # | Thay đổi | Alert nào firing | Thời gian từ lúc đổi đến khi quan sát firing | Panel rõ nhất |
 |---|---|---|---|---|
-| A | `MOCK_ERROR_RATE=0.2` | | | |
-| B | `MOCK_SLOW_RATE=0.3` | | | |
-| C | `LLM_MODEL=mock-llm-large` | | | |
-| D | `docker pause` 1 instance | | | |
-| E | `AGENT_VERSION=v1` | | | |
+| A | `MOCK_ERROR_RATE=0.2` | AgentHighErrorRate | 92.2 s | Error rate /ask |
+| B | `MOCK_SLOW_RATE=0.3` | AgentHighLatencyP95 | 147.4 s | Latency p95/p99 |
+| C | `LLM_MODEL=mock-llm-large` | LLMCostBurnRateHigh | 178.3 s | Cost burn rate USD/giờ |
+| D | `docker pause` 1 instance | AgentInstanceDown | 45.2 s | Instances up: 3 → 2 |
+| E | `AGENT_VERSION=v1` | Không firing tại thời điểm kiểm tra | Quan sát sau 55.0 s | Phiên bản đang chạy / retrieval hit ratio |
 
-**Thí nghiệm E không làm alert nào firing. Bạn sẽ phát hiện loại sự cố này trong production bằng cách nào?**
+A–C chạy kết hợp trên 3 replicas với 30 users, spawn 5/s, 5 phút để quan sát đồng thời; không phải ba thử nghiệm cô lập. Thời gian tính từ lúc đổi cấu hình đến lần polling đầu thấy firing, bao gồm thời gian recreate container và độ trễ scrape/evaluation. Nguồn [alert observations](benchmark-results/fault-alert-observations.json). Khi 3 alert cùng firing, error rate 20.35%, p95 1.943 s, burn rate mô phỏng $11.56/giờ. Locust /ask 849/4109 lỗi 503 (20.66%).
 
-...
+D: [JSON](benchmark-results/fault-d-observation.json), [ảnh alert](benchmark-results/fault-d-alert.png), [dashboard](benchmark-results/fault-d-dashboard.png). Locust ghi 27 lỗi 504 và 15 lỗi 503; Grafana agent error rate tại thời điểm chụp chỉ 0.94%, vì lỗi gateway không nhất thiết được đếm ở agent. Pause giữ target DNS nhưng scrape thất bại; stop có thể loại target khỏi DNS. Đã unpause.
+
+E: [JSON](benchmark-results/fault-e-observation.json), [ảnh alert](benchmark-results/fault-e-alert.png), [dashboard](benchmark-results/fault-e-dashboard.png). Cả 3 agent_info báo v1, Grafana error rate 0.70%, p95 198.62 ms, 4 alert inactive. Đây là quan sát trong thử nghiệm 90 giây, không chứng minh mọi thời điểm đều không có alert. Đã khôi phục v2/model nhỏ/slow 0.03/error 0.01.
+
+**Phát hiện regression chất lượng:** theo dõi eval định kỳ trên golden dataset, quality gate CI/CD trước deploy, đánh giá mẫu câu trả lời thật, retrieval hit ratio và feedback người dùng. CP7 cho thấy v1 chỉ 1/23 đúng; hạ tầng xanh không đồng nghĩa câu trả lời đúng.
 
 ### 4.3 Debug bằng trace
 
-Chọn 1 trace chậm nhất bạn tìm được:
-
-- `trace_id`: ...
-- Tổng thời gian: ... ms
-- Span chiếm nhiều thời gian nhất: ... (... ms, ...%)
-- Dòng log tương ứng (grep theo `trace_id`):
+Trace chậm nhất trong mẫu trace có log khớp lúc truy vấn (không khẳng định toàn bộ lịch sử):
+- Trace ID: `e59a77510da63909a7f97225760a89db`
+- Tổng thời gian: 2009.83 ms
+- Span chiếm nhiều thời gian nhất: `chat mock-llm-large` (1986.70 ms, 98.85%)
+- Dòng log tương ứng:
 
 ```json
-
+{"ts": "2026-11-25T09:44:36.334631+00:00", "level": "INFO", "service": "observable-agent", "instance": "56ca7d6f7770", "event": "llm_call", "trace_id": "e59a77510da63909a7f97225760a89db", "span_id": "e69fbd5f21f57e5b", "request_id": "146f5c0be2b4", "model": "mock-llm-large", "agent_version": "v2", "input_tokens": 74, "output_tokens": 37, "cost_usd": 0.000555, "llm_ms": 1985.8}
 ```
+
+Trace lỗi: `504db7a0c03c5f9e73357fe8fd1dddff`, HTTP 503, tổng 955.79 ms, span chat 929.78 ms; event exception.type=utils.mock_llm.LLMError, exception.message=Upstream LLM error: 503 Service Unavailable (mock). Dòng log khớp:
+
+```json
+{"ts": "2026-11-25T09:44:33.461930+00:00", "level": "INFO", "service": "observable-agent", "instance": "56ca7d6f7770", "event": "llm_error", "trace_id": "504db7a0c03c5f9e73357fe8fd1dddff", "span_id": "b0da9187d737bb5d", "request_id": "4b692f39236a", "error": "Upstream LLM error: 503 Service Unavailable (mock)"}
+```
+
+Nguồn: [slow evidence](benchmark-results/jaeger-slow-evidence.json), [error evidence](benchmark-results/jaeger-error-evidence.json).
 
 ---
 
 ## 5. Benchmark scaling (production, Locust headless, 100 users, 2 phút)
 
-> CP8 chưa chạy; không điền số ước lượng.
-
 | Số instance | RPS | p50 (ms) | p95 (ms) | p99 (ms) | Failures |
 |---|---|---|---|---|---|
-| 1 | | | | | |
-| 3 | | | | | |
+| 1 | 66.36 | 190 | 230 | 1700 | 63 |
+| 3 | 66.00 | 190 | 220 | 1700 | 58 |
 
-**Giải thích kết quả:** Scale có cải thiện p95 không? Nút thắt nằm ở đâu?
+Dùng dòng Aggregated (bao gồm /ask và /health), nguồn [1 replica](benchmark-results/scale_1_stats.csv), [3 replicas](benchmark-results/scale_3_stats.csv). Tương ứng 7911 và 7869 requests; error rate 0.80% và 0.74%. Cả hai Locust exit 1 vì có lỗi 503 mô phỏng, không phải benchmark không chạy.
 
-...
+**Giải thích:** p95 giảm nhẹ 230→220 ms, p99 vẫn 1700 ms, RPS gần như không đổi. Workload 100 users với think time 0.5–2 s và độ trễ LLM mô phỏng nên 1 instance đã đáp ứng mức tải này; tăng instance không loại bỏ tail latency của LLM. Không đủ dữ liệu để khẳng định bottleneck CPU/network; cần tăng tải và profiling.
 
 ---
 
@@ -132,4 +143,4 @@ Chọn 1 trace chậm nhất bạn tìm được:
   3. Retrieval nâng chất lượng và giảm cost/câu đúng; quality gate ngăn regression.
 - Nếu đưa agent này lên production thật, bạn sẽ thêm metric / alert nào nữa?
 
-Theo dõi p99, error budget burn rate, queue wait và CPU/memory để phân biệt bottleneck. CP8 sẽ bổ sung kết luận observability thực tế.
+Theo dõi p99, error budget burn rate, queue wait và CPU/memory để phân biệt bottleneck. Thêm synthetic check và metric 5xx/504 từ Nginx, kiểm tra chất lượng định kỳ; liên kết dashboard → trace → JSON log và sampling có ưu tiên lỗi/slow trace.

@@ -1,0 +1,56 @@
+{
+  "start_epoch": 1795600871.5570912,
+  "observed_seconds": 55.0,
+  "alerts": [],
+  "versions": [
+    {
+      "metric": {
+        "__name__": "agent_info",
+        "instance": "192.168.48.9:8000",
+        "job": "agent",
+        "model": "mock-llm-small",
+        "version": "v1"
+      },
+      "value": [
+        1795600926.494,
+        "1"
+      ]
+    },
+    {
+      "metric": {
+        "__name__": "agent_info",
+        "instance": "192.168.48.5:8000",
+        "job": "agent",
+        "model": "mock-llm-small",
+        "version": "v1"
+      },
+      "value": [
+        1795600926.494,
+        "1"
+      ]
+    },
+    {
+      "metric": {
+        "__name__": "agent_info",
+        "instance": "192.168.48.8:8000",
+        "job": "agent",
+        "model": "mock-llm-small",
+        "version": "v1"
+      },
+      "value": [
+        1795600926.494,
+        "1"
+      ]
+    }
+  ],
+  "retrieval": [],
+  "tokens": [
+    {
+      "metric": {},
+      "value": [
+        1795600926.5,
+        "892.5655973149583"
+      ]
+    }
+  ]
+}
